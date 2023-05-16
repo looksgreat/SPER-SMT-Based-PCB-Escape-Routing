@@ -4,30 +4,23 @@ using namespace std;
 
 class PCB{
 public:
-    PCB(){}
-    void setGridMap(int r, int c, int l);
-    void setPinConstraint(int x, int y, int z);
+    PCB();
+    void setGridMap(int r, int c, int l, vector<pair<int, int>> &pin, vector<pair<pair<int, int>, int>> &fanout, int mode);
+    void setPinConstraint(int x, int y);
     void setEdgeConstraint(int x, int y, int z);
     void setGridConstraint(int x, int y, int z);
-    void setOutConstraint(int x, int y, int z);
+    void setOutConstraint(int x, int y, int net = -999);
+    void setLength();
     void setConstraint();
 
 private:
     SOLVER *solver;
-    int row, col, layer;
+    int row, col, layer, pinNum;
     vector<vector<vector<expr>>> gridMap, netMap;
-    vector<vector<vector<int>>> gridType;
+    vector<vector<int>> outGrid, pinGrid;
+    expr totalLen, maxNetLen, minNetLen;
+    func_decl bool2int;
+    int mode;
 
 };
 
-class UI{
-public:
-    UI(){}
-    void createBoard(int x, int y, int z);
-    void addPin(int x, int y);
-    void addFanout(int x, int y, int signal = -999);
-    void setMode(int mode);
-private:
-    PCB *pcb;
-    int mode;
-}
