@@ -86,11 +86,11 @@ expr SOLVER::get_expr(){
   return ex;
 }
 
-auto SOLVER::get_int_sort() {
+sort SOLVER::get_int_sort() {
   return _context.int_sort();
 }
 
-auto SOLVER::get_bool_sort() {
+sort SOLVER::get_bool_sort() {
   return _context.bool_sort();
 }
 
