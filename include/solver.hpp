@@ -1,4 +1,4 @@
-//#pragma once
+#pragma once
 #include "z3++.h"
 using namespace z3;
 class SOLVER{
@@ -26,6 +26,8 @@ public:
   expr get_expr();
   sort get_int_sort();
   sort get_bool_sort();
+  void push();
+  void pop();
   
 private:
   context _context;

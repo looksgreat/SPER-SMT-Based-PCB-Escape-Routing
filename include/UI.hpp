@@ -1,4 +1,4 @@
-//#pragma once
+#pragma once
 #include "routing.hpp"
 class UI{
 public:

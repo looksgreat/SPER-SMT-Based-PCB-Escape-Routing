@@ -94,3 +94,10 @@ sort SOLVER::get_bool_sort() {
   return _context.bool_sort();
 }
 
+void SOLVER::push() {
+  _solver.push();
+}
+
+void SOLVER::pop() {
+  _solver.pop();
+}

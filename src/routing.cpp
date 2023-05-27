@@ -1,5 +1,7 @@
 #include "../include/routing.hpp"
 #include <iostream>
+#include <algorithm>
+#include <queue>
 #include "z3++.h"
 using namespace std;
 
@@ -29,6 +31,8 @@ void PCB::setGridMap(int r, int c, int l,vector<pair<pair<int, int>, int>> &pin,
         outGrid[it.first.first*2][it.first.second*2] = it.second;
     }
     this->pinNum = pin.size();
+    pinVect = &pin;
+    fanoutVect = &fanout;
 }
 
 void PCB::setPinConstraint(int x, int y, int net){
@@ -74,6 +78,45 @@ void PCB::setOutConstraint(int x, int y, int net){
         if(net != -999) solver->add(!gridMap[x][y][i] || netMap[x][y][i] == net);
     }
     solver->add(atleast(outGroup, 1) && atmost(outGroup, 1));
+}
+
+void PCB::setBoundingBox(){
+    //pin idx, radius
+    vector<pair<int, int>> boundPin;
+    for(int i = 0; i < pinVect->size(); i++){
+        int x = (*pinVect)[i].first.first*2, y = (*pinVect)[i].first.second*2;
+        int arr[4];
+        arr[0] = x; arr[1] = col-1-x; arr[2] = y; arr[3] = row-1-y;
+        std::sort(arr, arr+4);
+        for(int r = arr[0]; r < arr[3]; r++){
+            int radius = r, fanoutNum = fanoutVect->size(), inBox = 0;
+            for(int fanout = 0; fanout < fanoutNum; fanout++){
+                //test if fanout is in the bounding box
+                int fx = (*fanoutVect)[fanout].first.first*2, fy = (*fanoutVect)[fanout].first.second*2;
+                if(fx >= x-radius && fx <= x+radius && fy >= y-radius && fy <= y+radius) inBox++;
+            }
+            if(inBox >= fanoutNum/2){
+                boundPin.push_back(make_pair(i, radius));
+                break;
+            }
+        }
+    }
+    //set bounding box
+    for(int i = 0; i < boundPin.size(); i++){
+        int pinX = (*pinVect)[boundPin[i].first].first.first*2, pinY = (*pinVect)[boundPin[i].first].first.second*2, pinNet = (*pinVect)[boundPin[i].first].second;
+        int radius = boundPin[i].second;
+        for(int x = 0; x < col; x++){
+            for(int y = 0; y < row; y++){
+                for(int z = 0; z < layer; z++){
+                    if(!(x % 2 == 1 && y % 2 == 1)){
+                        if(x > pinX + radius+1 || x < pinX - radius-1 || y > pinY + radius+1 || y < pinY - radius-1) solver->add(!(netMap[x][y][z] == pinNet));
+                        
+                    }
+                }
+            }
+        }
+    }
+
 }
 
 void PCB::setLength(){
@@ -133,20 +176,33 @@ void PCB::setConstraint(){
             }
         }
     }
+    //setBoundingBox();
     setLength();
 }
 
 void PCB::getSolution(vector<vector<vector<int>>> &result){
+    solver->push();
+    setBoundingBox();
     bool pass;
     if(mode == 0){
         pass = solver->minimize(totalLen);
         pass = solver->minimize(maxNetLen - minNetLen);
     }
-    else{
+    else if(mode == 1){
         pass = solver->minimize(maxNetLen - minNetLen);
         pass = solver->minimize(totalLen);
-    } 
-    cout << solver->check() << endl;
+    }
+    //cout << solver->check() << endl;
+    int satisfy = solver->check();
+    if(satisfy == 0){
+        cout << "switch to no bounding box mode" << endl;
+        solver->pop();
+        satisfy = solver->check();
+    }
+    else{
+        cout << "bounding box mode" << endl;
+    }
+    if(satisfy == 0) throw runtime_error("unsat");
     model& m = solver->get_model();
     result.resize(col, vector<vector<int>>(row, vector<int>(layer, -1)));
     for(int x = 0; x < col; x++){
@@ -161,6 +217,70 @@ void PCB::getSolution(vector<vector<vector<int>>> &result){
     }
     cout << "total length: " << solver->eval_num(totalLen) << endl;
     cout << "length diff: " << solver->eval_num(maxNetLen) << " - " <<  solver->eval_num(minNetLen) << " = " << solver->eval_num(maxNetLen) - solver->eval_num(minNetLen) << endl;
+}
+
+void PCB::BFS(vector<vector<vector<int>>> &result){
+    vector<vector<vector<int>>> rt(col, vector<vector<int>>(row, vector<int>(layer, -1)));
+    for(auto &it : (*pinVect)){
+        int x = it.first.first*2, y = it.first.second*2, net = it.second, targetx, targety, z;
+        //cout << "net:" << net << endl;
+        for(int l = 0; l < layer; l++){
+            if(result[x][y][l] == net){
+                z = l;
+                break;
+            }
+        }
+        for(auto &fo : (*fanoutVect)){
+            int fx = fo.first.first*2, fy = fo.first.second*2;
+            if(result[fx][fy][z] == net){
+                targetx = fx, targety = fy;
+                break;
+            }
+
+        }
+        queue<pair<int, int>> q;
+        vector<vector<pair<int, int>>> front(col, vector<pair<int, int>>(row, make_pair(-1, -1)));
+        q.push(make_pair(x, y));
+        front[x][y] = make_pair(0, 0);
+        while(!q.empty()){
+            int curx = q.front().first, cury = q.front().second;
+            q.pop();
+            if(curx == targetx && cury == targety){
+                break;
+            }
+            if(curx > 0 && ((curx-1)%2 != 1 || cury%2 != 1) && front[curx-1][cury].first == -1 && (result[curx-1][cury][z] == -1 || result[curx-1][cury][z] == net) && (pinGrid[curx-1][cury] == -1) /*&& (outGrid[curx-1][cury] == -1 || (outGrid[curx-1][cury] == net))*/){
+                q.push(make_pair(curx-1, cury));
+                front[curx-1][cury] = make_pair(curx, cury);
+            }
+            if(curx < col-1 && ((curx+1)%2 != 1 || cury%2 != 1) && front[curx+1][cury].first == -1 && (result[curx+1][cury][z] == -1 || result[curx+1][cury][z] == net) && (pinGrid[curx+1][cury] == -1) /*&& (outGrid[curx+1][cury] == -1 || (outGrid[curx+1][cury] == net))*/){
+                q.push(make_pair(curx+1, cury));
+                front[curx+1][cury] =  make_pair(curx, cury);
+            }
+            if(cury > 0 &&  ((curx)%2 != 1 || (cury-1)%2 != 1)&& front[curx][cury-1].first == -1 && (result[curx][cury-1][z] == -1 || result[curx][cury-1][z] == net) && (pinGrid[curx][cury-1] == -1) /*&& (outGrid[curx][cury-1] == -1 || (outGrid[curx][cury-1] == net))*/){
+                q.push(make_pair(curx, cury-1));
+                front[curx][cury-1] =  make_pair(curx, cury);
+            }
+            if(cury < row-1 && ((curx)%2 != 1 || (cury+1)%2 != 1) && front[curx][cury+1].first == -1 && (result[curx][cury+1][z] == -1 || result[curx][cury+1][z] == net) && (pinGrid[curx][cury+1] == -1) /*&& (outGrid[curx][cury+1] == -1 || (outGrid[curx][cury+1] == net))*/){
+                q.push(make_pair(curx, cury+1));
+                front[curx][cury+1] =  make_pair(curx, cury);
+            }
+        }
+        if(q.empty()){
+            cout << net << " no path" << endl;
+            cout << endl;
+        } 
+        int tmpx = targetx, tmpy = targety;
+        //cout << "x: " << tmpx << " y: " << tmpy << endl;
+        //cout << "x: " << x << " y: " << y << endl;
+        while((tmpx != x) || (tmpy != y)){
+            //cout << "x: " << tmpx << " y: " << tmpy << endl;
+            rt[tmpx][tmpy][z] = net;
+            int tx = front[tmpx][tmpy].first, ty = front[tmpx][tmpy].second;
+            tmpx = tx, tmpy = ty;
+        }
+        rt[x][y][z] = net;
+    }
+    result = rt;
 }
 
     
