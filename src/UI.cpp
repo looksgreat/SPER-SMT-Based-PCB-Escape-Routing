@@ -1,5 +1,7 @@
 #include "../include/UI.hpp"
 #include <iostream>
+#include <pybind11/pybind11.h>
+#include <pybind11/stl.h>
 using namespace std;
 
 void UI::createBoard(int x, int y, int z){
@@ -28,6 +30,8 @@ void UI::getResult(){
     pcb->setGridMap(boundX, boundY, boundZ, pin, fanout, mode);
     pcb->setConstraint();
     pcb->getSolution(result);
+    if(mode == 3) pcb->BFS(result);
+    
 }
 
 void UI::outputResult(){
@@ -37,19 +41,19 @@ void UI::outputResult(){
             for(int x = 0; x < boundX*2-1; x++){
                 if(x%2 == 0 && y%2 == 0){
                     if(result[x][y][l] == -1) cout << ". ";
-                    else cout << result[x][y][l] << " ";
+                    else if(result[x][y][l] < pin.size()) cout << result[x][y][l] << " ";
                     //else if(result[x][y][l] == 0) cout << "x ";
-                    //else cout << ". ";
+                    else cout << ". ";
                 } 
                 else if(x%2 == 0 && y%2 == 1){
                     if(result[x][y][l] == -1) cout << ". ";
-                    else cout << "| ";
-                    //else cout << ". ";
+                    else if(result[x][y][l] < pin.size()) cout << "| ";
+                    else cout << ". ";
                 }
                 else if(x%2 == 1 && y%2 == 0){
                     if(result[x][y][l] == -1) cout << ". ";
-                    else  cout << "--";
-                    //else cout << ". ";
+                    else if(result[x][y][l] < pin.size()) cout << "--";
+                    else cout << ". ";
                 } 
                 else cout << "  ";
             }
@@ -57,4 +61,17 @@ void UI::outputResult(){
         }
         cout << endl;
     }
+}
+
+namespace py = pybind11;
+
+PYBIND11_MODULE(sper, m) {
+    py::class_<UI>(m, "UI")
+        .def(py::init<>())
+        .def("createBoard", &UI::createBoard)
+        .def("addPin", &UI::addPin)
+        .def("addFanout", &UI::addFanout)
+        .def("setMode", &UI::setMode)
+        .def("getResult", &UI::getResult)
+        .def("outputResult", &UI::outputResult);
 }
