@@ -34,8 +34,6 @@ void UI::getResult(){
     pcb->getSolution(result);
     if(mode == 3){
         pcb->BFS(result);
-        pcb->BFS(result);
-        pcb->BFS(result);
     }
     string outputfname = "sper";
     ofstream fout(outputfname + ".gdt");
