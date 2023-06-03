@@ -1,4 +1,4 @@
-#LD_LIBRARY_PATH /DATA/lllll/lib/
+#setenv LD_LIBRARY_PATH /DATA/lllll/lib/
 CXX = g++
 CXXFLAGS = -std=c++14 -g -O0 -L/DATA/lllll/lib# -shared -m64
 HEADERS = -I./include -I/DATA/lllll/include -I/DATA/lllll/.local/lib/python3.6/site-packages/pybind11/include/pybind11/ -I.

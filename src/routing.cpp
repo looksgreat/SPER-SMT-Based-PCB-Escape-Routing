@@ -205,11 +205,14 @@ void PCB::getSolution(vector<vector<vector<int>>> &result){
     if(satisfy == 0) throw runtime_error("unsat");
     model& m = solver->get_model();
     result.resize(col, vector<vector<int>>(row, vector<int>(layer, -1)));
+    vector<vector<vector<int>>> test;
+    test.resize(col, vector<vector<int>>(row, vector<int>(layer, -1)));
     for(int x = 0; x < col; x++){
         for(int y = 0; y < row; y++){
             for(int z = 0; z < layer; z++){
                 if(!(x % 2 == 1 && y % 2 == 1)){
                     if(solver->eval_bool(gridMap[x][y][z])/* && x != 0 && y != 0 && x != col-1 && y != row-1*/) result[x][y][z] = solver->eval_num(netMap[x][y][z]);
+                    test[x][y][z] = result[x][y][z];
                     //else result[x][y][z] = 0;
                 }
             }
@@ -217,70 +220,76 @@ void PCB::getSolution(vector<vector<vector<int>>> &result){
     }
     cout << "total length: " << solver->eval_num(totalLen) << endl;
     cout << "length diff: " << solver->eval_num(maxNetLen) << " - " <<  solver->eval_num(minNetLen) << " = " << solver->eval_num(maxNetLen) - solver->eval_num(minNetLen) << endl;
+    BFS(test);
 }
 
 void PCB::BFS(vector<vector<vector<int>>> &result){
-    vector<vector<vector<int>>> rt(col, vector<vector<int>>(row, vector<int>(layer, -1)));
-    for(auto &it : (*pinVect)){
-        int x = it.first.first*2, y = it.first.second*2, net = it.second, targetx, targety, z;
-        //cout << "net:" << net << endl;
-        for(int l = 0; l < layer; l++){
-            if(result[x][y][l] == net){
-                z = l;
-                break;
+    auto result_backup = result;
+    for(int time = 0; time < 3; time++){
+        vector<vector<vector<int>>> rt(col, vector<vector<int>>(row, vector<int>(layer, -1)));
+        for(auto &it : (*pinVect)){
+            int x = it.first.first*2, y = it.first.second*2, net = it.second, targetx, targety, z;
+            //cout << "net:" << net << endl;
+            for(int l = 0; l < layer; l++){
+                if(result_backup[x][y][l] == net){
+                    z = l;
+                    break;
+                }
             }
-        }
-        for(auto &fo : (*fanoutVect)){
-            int fx = fo.first.first*2, fy = fo.first.second*2;
-            if(result[fx][fy][z] == net){
-                targetx = fx, targety = fy;
-                break;
-            }
+            for(auto &fo : (*fanoutVect)){
+                int fx = fo.first.first*2, fy = fo.first.second*2;
+                if(result_backup[fx][fy][z] == net){
+                    targetx = fx, targety = fy;
+                    break;
+                }
 
-        }
-        queue<pair<int, int>> q;
-        vector<vector<pair<int, int>>> front(col, vector<pair<int, int>>(row, make_pair(-1, -1)));
-        q.push(make_pair(x, y));
-        front[x][y] = make_pair(0, 0);
-        while(!q.empty()){
-            int curx = q.front().first, cury = q.front().second;
-            q.pop();
-            if(curx == targetx && cury == targety){
-                break;
             }
-            if(curx > 0 && ((curx-1)%2 != 1 || cury%2 != 1) && front[curx-1][cury].first == -1 && (result[curx-1][cury][z] == -1 || result[curx-1][cury][z] == net) && (pinGrid[curx-1][cury] == -1) /*&& (outGrid[curx-1][cury] == -1 || (outGrid[curx-1][cury] == net))*/){
-                q.push(make_pair(curx-1, cury));
-                front[curx-1][cury] = make_pair(curx, cury);
+            queue<pair<int, int>> q;
+            vector<vector<pair<int, int>>> front(col, vector<pair<int, int>>(row, make_pair(-1, -1)));
+            q.push(make_pair(x, y));
+            front[x][y] = make_pair(0, 0);
+            int curx = 0, cury = 0;
+            while(!q.empty()){
+                curx = q.front().first;
+                cury = q.front().second;
+                q.pop();
+                if(curx == targetx && cury == targety){
+                    break;
+                }
+                if(curx > 0 && ((curx-1)%2 != 1 || cury%2 != 1) && front[curx-1][cury].first == -1 && (result[curx-1][cury][z] == -1 || result[curx-1][cury][z] == net) && (pinGrid[curx-1][cury] == -1) /*&& (outGrid[curx-1][cury] == -1 || (outGrid[curx-1][cury] == net))*/){
+                    q.push(make_pair(curx-1, cury));
+                    front[curx-1][cury] = make_pair(curx, cury);
+                }
+                if(curx < col-1 && ((curx+1)%2 != 1 || cury%2 != 1) && front[curx+1][cury].first == -1 && (result[curx+1][cury][z] == -1 || result[curx+1][cury][z] == net) && (pinGrid[curx+1][cury] == -1) /*&& (outGrid[curx+1][cury] == -1 || (outGrid[curx+1][cury] == net))*/){
+                    q.push(make_pair(curx+1, cury));
+                    front[curx+1][cury] =  make_pair(curx, cury);
+                }
+                if(cury > 0 &&  ((curx)%2 != 1 || (cury-1)%2 != 1)&& front[curx][cury-1].first == -1 && (result[curx][cury-1][z] == -1 || result[curx][cury-1][z] == net) && (pinGrid[curx][cury-1] == -1) /*&& (outGrid[curx][cury-1] == -1 || (outGrid[curx][cury-1] == net))*/){
+                    q.push(make_pair(curx, cury-1));
+                    front[curx][cury-1] =  make_pair(curx, cury);
+                }
+                if(cury < row-1 && ((curx)%2 != 1 || (cury+1)%2 != 1) && front[curx][cury+1].first == -1 && (result[curx][cury+1][z] == -1 || result[curx][cury+1][z] == net) && (pinGrid[curx][cury+1] == -1) /*&& (outGrid[curx][cury+1] == -1 || (outGrid[curx][cury+1] == net))*/){
+                    q.push(make_pair(curx, cury+1));
+                    front[curx][cury+1] =  make_pair(curx, cury);
+                }
             }
-            if(curx < col-1 && ((curx+1)%2 != 1 || cury%2 != 1) && front[curx+1][cury].first == -1 && (result[curx+1][cury][z] == -1 || result[curx+1][cury][z] == net) && (pinGrid[curx+1][cury] == -1) /*&& (outGrid[curx+1][cury] == -1 || (outGrid[curx+1][cury] == net))*/){
-                q.push(make_pair(curx+1, cury));
-                front[curx+1][cury] =  make_pair(curx, cury);
-            }
-            if(cury > 0 &&  ((curx)%2 != 1 || (cury-1)%2 != 1)&& front[curx][cury-1].first == -1 && (result[curx][cury-1][z] == -1 || result[curx][cury-1][z] == net) && (pinGrid[curx][cury-1] == -1) /*&& (outGrid[curx][cury-1] == -1 || (outGrid[curx][cury-1] == net))*/){
-                q.push(make_pair(curx, cury-1));
-                front[curx][cury-1] =  make_pair(curx, cury);
-            }
-            if(cury < row-1 && ((curx)%2 != 1 || (cury+1)%2 != 1) && front[curx][cury+1].first == -1 && (result[curx][cury+1][z] == -1 || result[curx][cury+1][z] == net) && (pinGrid[curx][cury+1] == -1) /*&& (outGrid[curx][cury+1] == -1 || (outGrid[curx][cury+1] == net))*/){
-                q.push(make_pair(curx, cury+1));
-                front[curx][cury+1] =  make_pair(curx, cury);
-            }
-        }
-        if(q.empty()){
-            cout << net << " no path" << endl;
-            cout << endl;
-        } 
-        int tmpx = targetx, tmpy = targety;
-        //cout << "x: " << tmpx << " y: " << tmpy << endl;
-        //cout << "x: " << x << " y: " << y << endl;
-        while((tmpx != x) || (tmpy != y)){
+            if(curx != targetx || cury != targety){
+                cout << net << " no path" << endl;
+                cout << endl;
+            } 
+            int tmpx = targetx, tmpy = targety;
             //cout << "x: " << tmpx << " y: " << tmpy << endl;
-            rt[tmpx][tmpy][z] = net;
-            int tx = front[tmpx][tmpy].first, ty = front[tmpx][tmpy].second;
-            tmpx = tx, tmpy = ty;
+            //cout << "x: " << x << " y: " << y << endl;
+            while((tmpx != x) || (tmpy != y)){
+                //cout << "x: " << tmpx << " y: " << tmpy << endl;
+                rt[tmpx][tmpy][z] = net;
+                int tx = front[tmpx][tmpy].first, ty = front[tmpx][tmpy].second;
+                tmpx = tx, tmpy = ty;
+            }
+            rt[x][y][z] = net;
         }
-        rt[x][y][z] = net;
+        result = rt;
     }
-    result = rt;
 }
 
     

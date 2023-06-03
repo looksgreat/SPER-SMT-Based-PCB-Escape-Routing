@@ -32,7 +32,11 @@ void UI::getResult(){
     pcb->setGridMap(boundX, boundY, boundZ, pin, fanout, mode);
     pcb->setConstraint();
     pcb->getSolution(result);
-    if(mode == 3) pcb->BFS(result);
+    if(mode == 3){
+        pcb->BFS(result);
+        pcb->BFS(result);
+        pcb->BFS(result);
+    }
     string outputfname = "sper";
     ofstream fout(outputfname + ".gdt");
     time_t rawtime;
@@ -130,6 +134,7 @@ void UI::getResult(){
 }
 
 void UI::outputResult(){
+    int cnt = 0;
     for(int l = 0; l < boundZ; l++){
         cout << "layer: " << l << endl;
         for(int y = boundY*2-2; y >= 0; y--){
@@ -142,12 +147,18 @@ void UI::outputResult(){
                 } 
                 else if(x%2 == 0 && y%2 == 1){
                     if(result[x][y][l] == -1) cout << ". ";
-                    else if(result[x][y][l] < pin.size()) cout << "| ";
+                    else if(result[x][y][l] < pin.size()){
+                        cout << "| ";
+                        cnt++;
+                    } 
                     else cout << ". ";
                 }
                 else if(x%2 == 1 && y%2 == 0){
                     if(result[x][y][l] == -1) cout << ". ";
-                    else if(result[x][y][l] < pin.size()) cout << "--";
+                    else if(result[x][y][l] < pin.size()){
+                        cout << "--";
+                        cnt++;
+                    } 
                     else cout << ". ";
                 } 
                 else cout << "  ";
@@ -156,6 +167,7 @@ void UI::outputResult(){
         }
         cout << endl;
     }
+    cout << "total wire length: " << cnt << endl;
 }
 
 namespace py = pybind11;
