@@ -39,12 +39,12 @@ make
         + width (int): The width of the board.
         + height (int): The height of the board.
         + layers (int): The number of layers in the board.
-3. `addPin(int x, int y, int layer)`
-    + Adds a pin to the board at the specified coordinates and layer.
+3. `addPin(int x, int y, int s)`
+    + Adds a pin with signal s to the board at the specified coordinates.
     + Parameters:
         + x (int): The x-coordinate of the pin.
         + y (int): The y-coordinate of the pin.
-        + layer (int): The layer in which the pin is added.
+        + s (int): The signal of the pin.
 4. `addFanout(int x, int y, int s (optional))`
     + Adds a fanout to the board at the specified coordinates.
     + Parameters:
